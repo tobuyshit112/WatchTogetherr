@@ -1,0 +1,48 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f1016;
+  --bg-alt: #171821;
+  --card: rgba(255, 255, 255, 0.04);
+  --card-border: rgba(255, 255, 255, 0.08);
+  --text: #e9e9f0;
+  --text-dim: #9a9aac;
+  --accent: #ff6b81;
+  --accent-2: #4f9dff;
+  --danger: #ff5c5c;
+
+  font: 16px/1.5 system-ui, 'Segoe UI', Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  background:
+    radial-gradient(circle at 15% -10%, rgba(255, 107, 129, 0.18), transparent 45%),
+    radial-gradient(circle at 85% 0%, rgba(79, 157, 255, 0.16), transparent 45%),
+    var(--bg);
+}
+
+#root {
+  min-height: 100svh;
+}
+
+h1, h2, h3 {
+  margin: 0;
+  font-weight: 600;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+input, select {
+  font: inherit;
+}
