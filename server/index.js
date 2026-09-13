@@ -69,14 +69,34 @@ io.on('connection', (socket) => {
     io.to(room.roomId).emit('participants-update', Array.from(room.participants.values()));
   });
 
-  socket.on('set-video', ({ url }) => {
+  socket.on('set-video', ({ url }, ack) => {
     const room = getRoom(socket.data.roomId);
-    if (!room || !canControl(room, socket.id)) return;
+    if (!room) return ack?.({ ok: false, error: 'Room not found.' });
+    if (!canControl(room, socket.id)) return ack?.({ ok: false, error: "You don't have permission to change the video." });
     const videoId = extractYoutubeId(url);
-    if (!videoId) return;
-    room.video = { videoId, url };
+    if (!videoId) {
+      return ack?.({ ok: false, error: "That doesn't look like a YouTube link. Only YouTube is supported right now." });
+    }
+    room.video = { provider: 'youtube', videoId, url };
     room.playback = { isPlaying: false, position: 0, updatedAt: Date.now() };
     io.to(room.roomId).emit('video-changed', { video: room.video, playback: { isPlaying: false, position: 0, serverTime: Date.now() } });
+    ack?.({ ok: true });
+  });
+
+  // Used by the browser extension: marks the room as watching something that
+  // can't be embedded (Netflix, Disney+, etc). No videoId — the extension on
+  // each person's own machine syncs the actual <video> element directly.
+  socket.on('set-external-source', ({ label, position = 0, isPlaying = false }, ack) => {
+    const room = getRoom(socket.data.roomId);
+    if (!room) return ack?.({ ok: false, error: 'Room not found.' });
+    if (!canControl(room, socket.id)) return ack?.({ ok: false, error: "You don't have permission to change the video." });
+    room.video = { provider: 'external', label: label || 'External' };
+    room.playback = { isPlaying, position, updatedAt: Date.now() };
+    io.to(room.roomId).emit('video-changed', {
+      video: room.video,
+      playback: { isPlaying, position, serverTime: Date.now() },
+    });
+    ack?.({ ok: true });
   });
 
   function broadcastPlayback(room) {

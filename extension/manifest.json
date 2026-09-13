@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Watch Together for Netflix",
+  "version": "1.0.0",
+  "description": "Sync Netflix playback, chat and reactions with your partner using your private Watch Together room.",
+  "action": { "default_popup": "popup.html" },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["storage", "alarms"],
+  "host_permissions": ["https://watchtogetherr-y1a3.onrender.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://*.netflix.com/*"],
+      "js": ["config.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

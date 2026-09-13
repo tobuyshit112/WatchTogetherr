@@ -10,6 +10,7 @@ export default function Room() {
   const { roomId } = useParams()
   const navigate = useNavigate()
   const videoRef = useRef(null)
+  const stageRef = useRef(null)
 
   const [identity, setIdentity] = useState(getStoredIdentity())
   const [nameDraft, setNameDraft] = useState(identity.name)
@@ -18,6 +19,7 @@ export default function Room() {
   const [state, setState] = useState(null)
   const [error, setError] = useState('')
   const [videoUrl, setVideoUrl] = useState('')
+  const [videoUrlError, setVideoUrlError] = useState('')
   const [floating, setFloating] = useState([])
   const [copied, setCopied] = useState(false)
 
@@ -88,14 +90,29 @@ export default function Room() {
   function loadVideo(e) {
     e.preventDefault()
     if (!videoUrl.trim()) return
-    socket.emit('set-video', { url: videoUrl.trim() })
-    setVideoUrl('')
+    socket.emit('set-video', { url: videoUrl.trim() }, (res) => {
+      if (!res?.ok) {
+        setVideoUrlError(res?.error || "Couldn't load that link.")
+      } else {
+        setVideoUrlError('')
+        setVideoUrl('')
+      }
+    })
   }
 
   function copyInvite() {
     navigator.clipboard?.writeText(window.location.href)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
+  }
+
+  function toggleFullscreen() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.()
+    } else {
+      const el = stageRef.current
+      el?.requestFullscreen?.() || el?.webkitRequestFullscreen?.()
+    }
   }
 
   if (!identity.name) {
@@ -163,30 +180,53 @@ export default function Room() {
 
       <div className="room-main">
         <div className="video-column">
-          <div className="video-stage">
-            <VideoPlayer
-              ref={videoRef}
-              videoId={state.video?.videoId}
-              remoteState={state.playback}
-              onLocalPlay={(position) => canControl && socket.emit('playback-play', { position })}
-              onLocalPause={(position) => canControl && socket.emit('playback-pause', { position })}
-              onStatusChange={(status) => socket.emit('set-status', { status })}
-            />
+          <div className="video-stage" ref={stageRef}>
+            {state.video?.provider === 'external' ? (
+              <div className="video-placeholder video-external">
+                <p>
+                  🎬 Watching <strong>{state.video.label}</strong> via the Watch Together extension.
+                  <br />
+                  The video plays in your Netflix tab — this tab is just for chat &amp; reactions, and stays in sync automatically.
+                </p>
+              </div>
+            ) : (
+              <VideoPlayer
+                ref={videoRef}
+                videoId={state.video?.videoId}
+                remoteState={state.playback}
+                onLocalPlay={(position) => canControl && socket.emit('playback-play', { position })}
+                onLocalPause={(position) => canControl && socket.emit('playback-pause', { position })}
+                onStatusChange={(status) => socket.emit('set-status', { status })}
+              />
+            )}
             <FloatingReactions items={floating} />
+            {state.video?.videoId && (
+              <button className="fullscreen-btn" onClick={toggleFullscreen} title="Fullscreen">⛶</button>
+            )}
           </div>
 
           <ReactionBar onReact={(emoji) => socket.emit('reaction', { emoji })} />
 
-          <form className="video-url-row" onSubmit={loadVideo}>
+          <form
+            className="video-url-row"
+            onSubmit={loadVideo}
+          >
             <input
               className="text-input"
               placeholder="Paste a YouTube link…"
               value={videoUrl}
-              onChange={(e) => setVideoUrl(e.target.value)}
+              onChange={(e) => {
+                setVideoUrl(e.target.value)
+                setVideoUrlError('')
+              }}
               disabled={!canControl}
             />
             <button className="secondary-btn" type="submit" disabled={!canControl}>Load</button>
           </form>
+          {videoUrlError && <p className="error-text">{videoUrlError}</p>}
+          <p className="video-hint">
+            For Netflix, Crunchyroll etc. — install the <strong>Watch Together extension</strong> and use it from that site directly instead of pasting a link here.
+          </p>
 
           {isHost && (
             <div className="host-controls">
@@ -207,7 +247,7 @@ export default function Room() {
           selfId={selfId}
           onSend={(text) => socket.emit('chat-message', { text })}
           onJumpTo={(position) => {
-            if (!canControl) return
+            if (!canControl || state.video?.provider === 'external') return
             videoRef.current?.seekTo(position)
             socket.emit('playback-seek', { position })
           }}

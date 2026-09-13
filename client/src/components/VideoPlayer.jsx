@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react'
 
 let ytApiPromise = null
 function loadYouTubeApi() {
@@ -30,6 +30,7 @@ const VideoPlayer = forwardRef(function VideoPlayer(
   const suppressUntilRef = useRef(0)
   const remoteStateRef = useRef(remoteState)
   const readyRef = useRef(false)
+  const [errorMsg, setErrorMsg] = useState('')
 
   remoteStateRef.current = remoteState
 
@@ -57,6 +58,7 @@ const VideoPlayer = forwardRef(function VideoPlayer(
   useEffect(() => {
     let cancelled = false
     if (!videoId) return
+    setErrorMsg('')
     loadYouTubeApi().then((YT) => {
       if (cancelled) return
       if (playerRef.current) {
@@ -70,7 +72,13 @@ const VideoPlayer = forwardRef(function VideoPlayer(
         events: {
           onReady: () => {
             readyRef.current = true
-            applyRemoteState(remoteStateRef.current, { forceSeek: true })
+            // Only force a seek/pause if we're joining mid-video. A freshly
+            // loaded video should sit at its normal thumbnail + play button —
+            // calling pauseVideo() on an unstarted player blanks it out.
+            const state = remoteStateRef.current
+            if (state && (state.isPlaying || state.position > 1)) {
+              applyRemoteState(state, { forceSeek: true })
+            }
           },
           onStateChange: (e) => {
             const YTState = window.YT.PlayerState
@@ -84,6 +92,16 @@ const VideoPlayer = forwardRef(function VideoPlayer(
             } else if (e.data === YTState.BUFFERING) {
               onStatusChange?.('buffering')
             }
+          },
+          onError: (e) => {
+            const messages = {
+              2: 'That YouTube link looks invalid.',
+              5: "This video can't be played in an embedded player.",
+              100: 'This video was removed or made private.',
+              101: "The owner of this video has disabled it from playing on other sites — try a different link.",
+              150: "The owner of this video has disabled it from playing on other sites — try a different link.",
+            }
+            setErrorMsg(messages[e.data] || "This video can't be loaded.")
           },
         },
       })
@@ -123,6 +141,11 @@ const VideoPlayer = forwardRef(function VideoPlayer(
       {!videoId && (
         <div className="video-placeholder">
           <p>Paste a YouTube link below to start watching together</p>
+        </div>
+      )}
+      {videoId && errorMsg && (
+        <div className="video-placeholder video-error">
+          <p>{errorMsg}</p>
         </div>
       )}
     </div>
